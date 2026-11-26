@@ -44,15 +44,15 @@
       const cy = -radius + 78;
 
       // Soft outer atmospheric corona
-      const corona = ctx.createRadialGradient(cx, cy, radius - 8, cx, cy, radius + 140);
-      corona.addColorStop(0, "rgba(210, 220, 244, 0.18)");
-      corona.addColorStop(0.32, "rgba(148, 163, 210, 0.08)");
-      corona.addColorStop(0.7, "rgba(90, 105, 145, 0.02)");
+      const corona = ctx.createRadialGradient(cx, cy, radius - 8, cx, cy, radius + 75);
+      corona.addColorStop(0, "rgba(210, 220, 244, 0.13)");
+      corona.addColorStop(0.35, "rgba(148, 163, 210, 0.055)");
+      corona.addColorStop(0.72, "rgba(90, 105, 145, 0.012)");
       corona.addColorStop(1, "rgba(7, 7, 10, 0)");
 
       ctx.fillStyle = corona;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius + 140, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius + 75, 0, Math.PI * 2);
       ctx.fill();
 
       // Dark planetary sphere with subtle rim
