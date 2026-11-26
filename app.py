@@ -7,7 +7,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -64,6 +64,11 @@ async def index(request: Request) -> HTMLResponse:
     current_url = str(request.base_url).rstrip("/") + "/"
     rendered = raw_html.replace("__SELF_URL__", current_url)
     return HTMLResponse(content=rendered)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/static/favicon.svg?v=2", status_code=302)
 
 
 @app.get("/api/health")
