@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI SEO &amp; Page Auditor — аудит сайтов и оптимизация под нейропоиск</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <canvas id="wakeCanvas" aria-hidden="true"></canvas>
+
+  <div class="hero-shell">
+    <canvas id="horizonCanvas" aria-hidden="true"></canvas>
+
+    <div class="container">
+      <nav class="topnav">
+        <a href="#" class="brand-mark">
+          <span class="brand-dot"></span>
+          <span>AI SEO Auditor</span>
+        </a>
+        <div class="nav-links">
+          <a href="#auditor-section">Аудит страницы</a>
+          <a href="#compare-section">Сравнение конкурентов</a>
+        </div>
+        <span class="status-pill" id="modeBadge">Готов к проверке</span>
+      </nav>
+
+      <header class="hero-content">
+        <span class="hero-kicker">Python · FastAPI · 30 SEO &amp; GEO метрик</span>
+        <h1 class="hero-title">Технический аудит и рост видимости в поиске и ИИ</h1>
+        <p class="hero-lead">
+          Проверяет 30 параметров индексации, структуры и безопасности за пару секунд,
+          показывает сниппет в выдаче и генерирует готовые мета-теги через LLM.
+        </p>
+
+        <div class="hero-cta-group">
+          <button type="button" class="silver-btn" id="heroStartBtn">
+            <span>Перейти к проверке сайта</span>
+          </button>
+          <a href="#compare-section" class="btn-ghost">Сравнить 2 сайта</a>
+        </div>
+
+        <div class="hero-badges">
+          <span class="hero-badge">Глубже Chrome Lighthouse</span>
+          <span class="hero-badge">GEO-оптимизация под AI Overviews</span>
+          <span class="hero-badge">Безопасный код только для &lt;head&gt;</span>
+        </div>
+      </header>
+    </div>
+  </div>
+
+  <main class="container workspace">
+    <!-- SECTION 1: SINGLE PAGE AUDITOR -->
+    <section class="bento-panel" id="auditor-section">
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="url" type="button">По ссылке (URL)</button>
+        <button class="tab-btn" data-tab="html" type="button">Вставить HTML-код</button>
+      </div>
+
+      <form id="auditForm">
+        <div id="urlPanel">
+          <div class="input-row" id="targetInputWrap">
+            <input type="text" id="urlInput" placeholder="https://example.com" autocomplete="url">
+            <button class="silver-btn" type="submit" id="submitBtn">
+              <span>Проверить</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="htmlPanel" class="hidden">
+          <textarea id="htmlInput" placeholder="Вставьте исходный HTML-код страницы..."></textarea>
+          <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+            <button class="silver-btn" type="submit" id="submitHtmlBtn">
+              <span>Разобрать HTML</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="demo-row">
+          <span class="demo-label">Быстрый тест:</span>
+          <button type="button" class="btn-ghost" data-demo="flawed-landing">Лендинг с ошибками SEO</button>
+          <button type="button" class="btn-ghost" data-demo="strong-saas">SaaS-страница (высокий скор)</button>
+        </div>
+
+        <details class="settings">
+          <summary>Настройки LLM API (необязательно — ключ уже подключен на сервере)</summary>
+          <div class="settings-grid">
+            <select id="providerSelect">
+              <option value="auto">Авто (OpenRouter / серверный ключ)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="nvidia">NVIDIA NIM</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+            <input type="password" id="apiKeyInput" placeholder="Свой API-ключ (опционально, не сохраняется на сервере)">
+          </div>
+        </details>
+      </form>
+
+      <!-- Harmonious Step-by-Step Guide when site blocks scraping or is JS-only SPA -->
+      <div id="diagCard" class="diag-card hidden">
+        <div class="diag-head">
+          <div>
+            <h3 class="diag-title" id="diagTitle">Сайт закрыт от прямого парсинга</h3>
+            <p class="diag-reason" id="diagReason"></p>
+          </div>
+          <button type="button" class="silver-btn" id="switchToHtmlBtn">
+            <span>Открыть вкладку HTML</span>
+          </button>
+        </div>
+        <div class="diag-steps">
+          <div class="diag-step">
+            <b>1. Откройте код страницы в браузере</b>
+            Перейдите на нужный сайт в новой вкладке и нажмите <code>Ctrl + U</code> (или ПКМ → «Просмотр кода страницы»).
+          </div>
+          <div class="diag-step">
+            <b>2. Скопируйте весь HTML</b>
+            Нажмите <code>Ctrl + A</code>, чтобы выделить весь текст кода, и <code>Ctrl + C</code> для копирования.
+          </div>
+          <div class="diag-step">
+            <b>3. Вставьте сюда на разбор</b>
+            Нажмите кнопку выше, вставьте код в поле <code>Ctrl + V</code> и запустите полный SEO- и GEO-аудит.
+          </div>
+        </div>
+      </div>
+
+      <div id="errorBox" class="error-box hidden"></div>
+    </section>
+
+    <!-- BENTO DASHBOARD RESULTS -->
+    <section id="results" class="results-bento hidden">
+      <div class="bento-top-grid">
+        <div class="bento-panel score-card">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-fg" id="scoreRing" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+            </svg>
+            <div class="ring-val">
+              <span class="ring-num" id="scoreNum">0</span>
+              <span class="ring-sub" id="scoreGrade">GRADE -</span>
+            </div>
+          </div>
+          <span class="provider-badge" id="aiProviderPill">—</span>
+        </div>
+
+        <div class="bento-panel">
+          <div class="section-head" style="margin-bottom:8px;">
+            <span class="sub-label" style="margin:0;">Предпросмотр в поиске (SERP)</span>
+            <div class="serp-switch" id="serpSwitch">
+              <button type="button" class="mini-pill active" data-serp="current">Текущий</button>
+              <button type="button" class="mini-pill" data-serp="0">ИИ 1</button>
+              <button type="button" class="mini-pill" data-serp="1">ИИ 2</button>
+              <button type="button" class="mini-pill" data-serp="2">ИИ 3</button>
+            </div>
+          </div>
+          <div class="serp-box">
+            <div class="serp-url" id="serpUrl">https://example.com</div>
+            <div class="serp-title" id="serpTitle">Заголовок страницы</div>
+            <div class="serp-desc" id="serpDesc">Описание страницы в поисковой выдаче.</div>
+          </div>
+        </div>
+
+        <div class="bento-panel" style="display:flex; flex-direction:column; justify-content:space-between; gap:12px;">
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="btn-ghost" id="exportMdBtn">Скачать .md</button>
+            <button type="button" class="btn-ghost" id="exportJsonBtn">Скачать .json</button>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="kpi-label">Объем текста</div>
+              <div class="kpi-value" id="kpiWords">0 слов</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Картинки без alt</div>
+              <div class="kpi-value" id="kpiAlt">0/0</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Скорость / Вес</div>
+              <div class="kpi-value" id="kpiSpeed">0 мс</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Ошибки / Предупр.</div>
+              <div class="kpi-value" id="kpiIssues">0 / 0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bento-mid-grid">
+        <div class="bento-panel">
+          <div class="section-head">
+            <h2>Вывод и приоритеты исправлений</h2>
+          </div>
+          <div class="ai-verdict" id="aiSummary"></div>
+          <div class="sub-label">Что исправить в первую очередь</div>
+          <ul class="bullet-list" id="priorityList"></ul>
+
+          <div class="sub-label" style="margin-top:18px;">Готовность к нейропоиску (GEO)</div>
+          <ul class="bullet-list" id="aiGeo"></ul>
+        </div>
+
+        <div class="bento-panel">
+          <div class="section-head">
+            <h2>Готовые мета-теги (нажмите, чтобы скопировать)</h2>
+          </div>
+          <div class="sub-label">Варианты Title (45–60 символов)</div>
+          <div id="aiTitles"></div>
+
+          <div class="sub-label" style="margin-top:16px;">Варианты Description (130–160 символов)</div>
+          <div id="aiDescriptions"></div>
+        </div>
+      </div>
+
+      <div class="bento-panel">
+        <div class="section-head">
+          <div class="tabs" style="margin-bottom:0;" role="tablist">
+            <button type="button" class="tab-btn active" data-detail-tab="checks">Чек-лист (30 проверок)</button>
+            <button type="button" class="tab-btn" data-detail-tab="structure">Семантика и H1–H3</button>
+            <button type="button" class="tab-btn" data-detail-tab="code">Невидимый код для &lt;head&gt;</button>
+          </div>
+
+          <div class="filter-row" id="checkFilters">
+            <button type="button" class="filter-btn active" data-filter="issues">Только проблемы</button>
+            <button type="button" class="filter-btn" data-filter="all">Все 30</button>
+            <button type="button" class="filter-btn" data-filter="fail">Ошибки</button>
+            <button type="button" class="filter-btn" data-filter="warn">Предупреждения</button>
+            <button type="button" class="filter-btn" data-filter="pass">Ок</button>
+          </div>
+        </div>
+
+        <div id="detailChecks">
+          <div class="checks-list" id="checksList"></div>
+        </div>
+
+        <div id="detailStructure" class="hidden">
+          <div class="sub-label">Топ-8 ключевых слов страницы</div>
+          <div class="kw-cloud" id="kwCloud"></div>
+          <div class="headings-box">
+            <div class="heading-col">
+              <div class="sub-label">H1</div>
+              <ul id="listH1"></ul>
+            </div>
+            <div class="heading-col">
+              <div class="sub-label">H2</div>
+              <ul id="listH2"></ul>
+            </div>
+            <div class="heading-col">
+              <div class="sub-label">H3</div>
+              <ul id="listH3"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="detailCode" class="hidden">
+          <div class="section-head" style="margin-bottom:10px;">
+            <span class="diag-reason" style="margin:0;">Этот блок вставляется внутрь <code>&lt;head&gt;</code> — он обновляет мета-теги и Schema.org для поисковиков, не затрагивая дизайн и видимую верстку.</span>
+            <button type="button" class="btn-ghost" id="copyCodeBtn">Скопировать код</button>
+          </div>
+          <pre class="code-block" id="headCodeBlock"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: DEDICATED COMPETITOR COMPARISON -->
+    <section class="bento-panel" id="compare-section">
+      <div class="section-head">
+        <div>
+          <h2>Сравнение с конкурентом</h2>
+          <p class="diag-reason">Параллельный разбор двух страниц по ключевым SEO- и GEO-метрикам.</p>
+        </div>
+      </div>
+
+      <form id="compareForm" class="compare-inputs">
+        <input type="text" id="urlAInput" placeholder="Ваш сайт: https://example.com">
+        <input type="text" id="urlBInput" placeholder="Конкурент: https://competitor.com">
+        <button type="submit" class="silver-btn" id="compareBtn">
+          <span>Сравнить</span>
+        </button>
+      </form>
+
+      <div id="compareError" class="error-box hidden"></div>
+
+      <div id="compareResults" class="hidden" style="margin-top:18px;">
+        <div class="ai-verdict" id="compareVerdict"></div>
+        <div style="overflow-x:auto;">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>Метрика</th>
+                <th id="thSiteA">Сайт A</th>
+                <th id="thSiteB">Сайт B</th>
+              </tr>
+            </thead>
+            <tbody id="compareBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
