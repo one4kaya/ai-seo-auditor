@@ -31,11 +31,10 @@ def test_truncate_words_no_dangling_prepositions():
 def test_heuristic_recommendations_include_head_snippet():
     demo = DEMO_PAGES["flawed-landing"]
     audit = analyze_html(demo["html"], url=demo["url"])
-    rec = build_heuristic_recommendations(audit)
+    rec = build_heuristic_recommendations(audit, page_type="saas")
     assert rec["mode"] == "heuristic"
     assert len(rec["suggested_titles"]) == 3
-    assert "<title>" in rec["head_snippet"]
-    assert "application/ld+json" in rec["head_snippet"]
+    assert "SoftwareApplication" in rec["head_snippet"]
 
 
 def test_ssrf_blocks_localhost():

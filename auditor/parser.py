@@ -148,7 +148,6 @@ async def fetch_html(url: str, timeout: float = 15.0) -> tuple[str, str, int, in
             reason="Аудитор анализирует только веб-страницы в формате HTML.",
         )
 
-    # Check if page is an empty JS-only SPA shell
     soup_check = BeautifulSoup(response.text, "html.parser")
     for t in soup_check(["script", "style", "noscript", "svg", "template"]):
         t.decompose()
@@ -169,7 +168,6 @@ def _clean_text(text: str) -> str:
 
 
 def _estimate_title_px(title: str) -> int:
-    """Approximate pixel width of title in Google SERP (~9.5px avg for Cyrillic/Latin)."""
     px = 0.0
     for ch in title:
         if ch.isupper() or ch in "MWЖЩШЮФ@":
@@ -234,7 +232,6 @@ def analyze_html(
     is_https = parsed_url.scheme == "https"
     base_host = (parsed_url.hostname or "").lower()
 
-    # Meta tags
     title_tags = soup.find_all("title")
     title = _clean_text(title_tags[0].get_text()) if title_tags else ""
     title_px = _estimate_title_px(title)
@@ -268,7 +265,6 @@ def analyze_html(
     html_tag = soup.find("html")
     lang = _clean_text(html_tag.get("lang", "")) if html_tag else ""
 
-    # Open Graph & Twitter Card
     og_tags: dict[str, str] = {}
     for prop in ("og:title", "og:description", "og:image", "og:url", "og:type"):
         tag = soup.find("meta", attrs={"property": re.compile(f"^{re.escape(prop)}$", re.I)})
@@ -280,7 +276,6 @@ def analyze_html(
 
     json_ld_types = _extract_json_ld_types(soup)
 
-    # Headings & Hierarchy
     all_headings = soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
     heading_levels = [int(h.name[1]) for h in all_headings]
     hierarchy_skips = 0
@@ -293,7 +288,6 @@ def analyze_html(
     h3_list = [_clean_text(h.get_text()) for h in soup.find_all("h3") if _clean_text(h.get_text())]
     question_headings = sum(1 for h in (h2_list + h3_list) if "?" in h)
 
-    # Images & Mixed Content
     images = soup.find_all("img")
     images_total = len(images)
     images_missing_alt = 0
@@ -301,7 +295,7 @@ def analyze_html(
     images_lazy = 0
     mixed_content_count = 0
 
-    for idx, img in enumerate(images):
+    for img in images:
         alt = _clean_text(img.get("alt", ""))
         if not alt:
             images_missing_alt += 1
@@ -318,7 +312,6 @@ def analyze_html(
         if is_https and s.lower().startswith("http://"):
             mixed_content_count += 1
 
-    # Links
     links_internal = 0
     links_external = 0
     empty_links = 0
@@ -341,7 +334,6 @@ def analyze_html(
             if target == "_blank" and "noopener" not in rel:
                 unsafe_external_links += 1
 
-    # Visible body text & lists/tables
     body_clone = BeautifulSoup(html, "html.parser")
     lists_count = len(body_clone.find_all(["ul", "ol"]))
     tables_count = len(body_clone.find_all("table"))
@@ -355,7 +347,6 @@ def analyze_html(
     text_html_ratio = round((text_bytes / html_bytes) * 100, 1) if html_bytes > 0 else 0.0
     top_keywords = _extract_top_keywords(words, limit=8)
 
-    # --- 30 Checks across 5 categories (max 100 pts) ---
     checks: list[dict[str, str]] = []
     score = 0
 

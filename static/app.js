@@ -3,33 +3,21 @@
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // 1. Subtle ASCII Wake background (adapted from след.txt with low silver-slate opacity)
+  // 1. Crisp, smooth ASCII Wake pointer trail (clearly visible, no glitchy dots)
   (function initAsciiWake() {
     const canvas = document.getElementById("wakeCanvas");
-    if (!canvas) return;
+    if (!canvas || reducedMotion) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const RAMP = " .:-=+*#%@";
-    const cellSize = 14;
+    const cellSize = 15;
     let cols = 0;
     let rows = 0;
     let heat = new Float32Array(0);
     let rate = new Float32Array(0);
-    let ambient = new Float32Array(0);
     let last = 0;
     const pointer = { x: -1, y: -1, t: 0, has: false };
-
-    function mulberry32(seed) {
-      let a = seed >>> 0;
-      return () => {
-        a |= 0;
-        a = (a + 0x6d2b79f5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-    }
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -38,7 +26,7 @@
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.font = `${cellSize * 0.8}px ui-monospace, monospace`;
+      ctx.font = `600 ${Math.round(cellSize * 0.82)}px "JetBrains Mono", ui-monospace, monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
@@ -46,37 +34,28 @@
       rows = Math.ceil(h / cellSize);
       const n = cols * rows;
       heat = new Float32Array(n);
-      rate = new Float32Array(n).fill(1.6);
-      ambient = new Float32Array(n);
-
-      const rand = mulberry32(0xa53f9c1 ^ (cols * 71 + rows));
-      for (let i = 0; i < n; i++) {
-        if (rand() < 0.022) ambient[i] = 0.03 + rand() * 0.05;
-      }
+      rate = new Float32Array(n).fill(1.35);
     }
 
     function draw() {
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      ctx.fillStyle = "#b4b7c9";
       for (let gy = 0; gy < rows; gy++) {
         for (let gx = 0; gx < cols; gx++) {
           const idx = gy * cols + gx;
-          const lum = Math.max(ambient[idx], heat[idx]);
-          if (lum <= 0.02) continue;
+          const lum = heat[idx];
+          if (lum <= 0.03) continue;
           const ch = RAMP[Math.min(RAMP.length - 1, Math.floor(lum * (RAMP.length - 1)))];
           if (ch === " ") continue;
-          // Kept deliberately subtle (max ~0.16 opacity) so text stays crisp
-          ctx.globalAlpha = Math.min(0.16, 0.03 + lum * 0.14);
+          ctx.fillStyle = `rgba(214, 222, 248, ${(lum * 0.44).toFixed(3)})`;
           ctx.fillText(ch, gx * cellSize + cellSize / 2, gy * cellSize + cellSize / 2);
         }
       }
-      ctx.globalAlpha = 1;
     }
 
     function stamp(px, py, radiusCells, decayRate) {
       const cx = px / cellSize;
       const cy = py / cellSize;
-      const r = Math.max(0.6, radiusCells);
+      const r = Math.max(1.2, radiusCells);
       const minGx = Math.max(0, Math.floor(cx - r));
       const maxGx = Math.min(cols - 1, Math.ceil(cx + r));
       const minGy = Math.max(0, Math.floor(cy - r));
@@ -85,7 +64,7 @@
         for (let gx = minGx; gx <= maxGx; gx++) {
           const d = Math.hypot(gx + 0.5 - cx, gy + 0.5 - cy);
           if (d > r) continue;
-          const falloff = 1 - d / r;
+          const falloff = Math.pow(1 - d / r, 1.35);
           const idx = gy * cols + gx;
           if (falloff > heat[idx]) {
             heat[idx] = falloff;
@@ -96,11 +75,6 @@
     }
 
     resize();
-    if (reducedMotion) {
-      draw();
-      return;
-    }
-
     window.addEventListener("pointermove", (e) => {
       const x = e.clientX;
       const y = e.clientY;
@@ -111,15 +85,15 @@
         const dist = Math.hypot(dx, dy);
         const dt = Math.max(1, now - pointer.t);
         const speed = dist / dt;
-        const radiusCells = Math.max(0.6, Math.min(2.2, 2.0 / (1 + speed * 1.6)));
-        const decayRate = Math.max(1.0, Math.min(4.5, 1.2 + speed * 3.0));
-        const steps = Math.max(1, Math.ceil(dist / (cellSize * 0.5)));
+        const radiusCells = Math.max(1.5, Math.min(3.2, 3.0 / (1 + speed * 1.1)));
+        const decayRate = Math.max(0.95, Math.min(2.6, 1.05 + speed * 1.6));
+        const steps = Math.max(1, Math.ceil(dist / (cellSize * 0.4)));
         for (let s = 1; s <= steps; s++) {
           const t = s / steps;
           stamp(pointer.x + dx * t, pointer.y + dy * t, radiusCells, decayRate);
         }
       } else {
-        stamp(x, y, 1.3, 1.5);
+        stamp(x, y, 2.2, 1.2);
       }
       pointer.x = x;
       pointer.y = y;
@@ -143,14 +117,22 @@
     requestAnimationFrame(loop);
   })();
 
-  // 2. Top Horizon Planet Rim (inspired by zapline.html in cool silver-slate palette)
+  // 2. Animated Celestial Horizon & Orbiting Light Flare (Hero top centerpiece)
   (function initHorizon() {
     const canvas = document.getElementById("horizonCanvas");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let phase = 0;
+    const stars = Array.from({ length: 56 }, (_, i) => ({
+      rx: ((i * 73 + 19) % 100) / 100,
+      ry: ((i * 41 + 11) % 100) / 100,
+      r: (i % 3 === 0) ? 1.3 : 0.8,
+      speed: 0.4 + (i % 5) * 0.25,
+      phase: i * 0.7,
+    }));
+
+    let t = 0;
     function drawHorizon() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = canvas.clientWidth;
@@ -160,47 +142,80 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
+      // Subtle twinkling stars in upper sky
+      stars.forEach((s) => {
+        const sx = s.rx * w;
+        const sy = s.ry * (h * 0.72);
+        const alpha = 0.14 + 0.22 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
+        ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
       const cx = w / 2;
-      const radius = Math.max(680, w * 0.62);
-      const cy = -radius + 115;
+      const radius = Math.max(760, w * 0.66);
+      const cy = -radius + 132;
 
-      // Atmospheric halo
-      const glow = ctx.createRadialGradient(cx, cy, radius - 14, cx, cy, radius + 75);
-      glow.addColorStop(0, "rgba(220, 226, 245, 0.0)");
-      glow.addColorStop(0.22, "rgba(215, 222, 245, 0.22)");
-      glow.addColorStop(0.5, "rgba(150, 160, 195, 0.08)");
-      glow.addColorStop(1, "rgba(7, 7, 9, 0)");
+      // Outer atmospheric corona
+      const corona = ctx.createRadialGradient(cx, cy, radius - 6, cx, cy, radius + 120);
+      corona.addColorStop(0, "rgba(226, 232, 248, 0.34)");
+      corona.addColorStop(0.28, "rgba(165, 180, 225, 0.14)");
+      corona.addColorStop(0.65, "rgba(100, 116, 155, 0.04)");
+      corona.addColorStop(1, "rgba(7, 7, 10, 0)");
 
-      ctx.fillStyle = glow;
+      ctx.fillStyle = corona;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius + 75, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius + 120, 0, Math.PI * 2);
       ctx.fill();
 
-      // Dark planetary body masking upper stars
-      const bodyGrad = ctx.createRadialGradient(cx, cy + radius * 0.3, 10, cx, cy, radius);
-      bodyGrad.addColorStop(0, "#0b0c10");
-      bodyGrad.addColorStop(0.92, "#070709");
-      bodyGrad.addColorStop(1, "#14161f");
-      ctx.fillStyle = bodyGrad;
+      // Dark planetary sphere with internal subtle rim reflection
+      const planetFill = ctx.createRadialGradient(cx, cy + radius * 0.25, radius * 0.15, cx, cy, radius);
+      planetFill.addColorStop(0, "#0b0c12");
+      planetFill.addColorStop(0.86, "#07070a");
+      planetFill.addColorStop(0.97, "#111420");
+      planetFill.addColorStop(1, "#262b3d");
+      ctx.fillStyle = planetFill;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Crisp silver rim highlight with gentle breathing shimmer
-      const shimmer = reducedMotion ? 0.55 : 0.45 + 0.15 * Math.sin(phase);
-      const rimGrad = ctx.createLinearGradient(cx - radius * 0.6, 0, cx + radius * 0.6, 0);
-      rimGrad.addColorStop(0, "rgba(255,255,255,0)");
-      rimGrad.addColorStop(0.5, `rgba(235, 240, 255, ${shimmer.toFixed(2)})`);
-      rimGrad.addColorStop(1, "rgba(255,255,255,0)");
-
-      ctx.strokeStyle = rimGrad;
+      // Base silver horizon rim
+      const baseRim = ctx.createLinearGradient(cx - radius * 0.55, 0, cx + radius * 0.55, 0);
+      baseRim.addColorStop(0, "rgba(255,255,255,0)");
+      baseRim.addColorStop(0.5, "rgba(226, 232, 248, 0.52)");
+      baseRim.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.strokeStyle = baseRim;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.arc(cx, cy, radius, 0.18 * Math.PI, 0.82 * Math.PI);
+      ctx.stroke();
+
+      // Orbiting light pulse sweeping smoothly back and forth along the horizon arc
+      const sweepAngle = Math.PI * 0.5 + Math.sin(t * 0.75) * 0.24;
+      const fx = cx + Math.cos(sweepAngle) * radius;
+      const fy = cy + Math.sin(sweepAngle) * radius;
+
+      const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, 135);
+      flare.addColorStop(0, "rgba(255, 255, 255, 0.82)");
+      flare.addColorStop(0.2, "rgba(219, 230, 255, 0.34)");
+      flare.addColorStop(0.55, "rgba(148, 163, 210, 0.08)");
+      flare.addColorStop(1, "rgba(7, 7, 10, 0)");
+
+      ctx.fillStyle = flare;
+      ctx.beginPath();
+      ctx.arc(fx, fy, 135, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bright core arc segment around the traveling flare
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, sweepAngle - 0.055, sweepAngle + 0.055);
       ctx.stroke();
 
       if (!reducedMotion) {
-        phase += 0.018;
+        t += 0.022;
         requestAnimationFrame(drawHorizon);
       }
     }
@@ -230,17 +245,60 @@
     }, 350);
   });
 
-  // 4. Main Audit Logic
+  // 4. Recent Audits History in localStorage
+  const HISTORY_KEY = "seo_auditor_history_v1";
+  const historyBar = document.getElementById("historyBar");
+  const historyChips = document.getElementById("historyChips");
+
+  function loadHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveToHistory(auditData) {
+    if (!auditData || !auditData.url || auditData.url.includes(".example")) return;
+    const items = loadHistory().filter((x) => x.url !== auditData.url);
+    items.unshift({ url: auditData.url, score: auditData.score, grade: auditData.grade });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 4)));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const items = loadHistory();
+    if (!items.length) {
+      historyBar.classList.add("hidden");
+      return;
+    }
+    historyBar.classList.remove("hidden");
+    historyChips.innerHTML = "";
+    items.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "history-chip";
+      const shortHost = item.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      btn.textContent = `${shortHost} · ${item.score}/100`;
+      btn.addEventListener("click", () => {
+        switchInputTab("url");
+        urlInput.value = item.url;
+        runAudit({ url: item.url });
+      });
+      historyChips.appendChild(btn);
+    });
+  }
+  renderHistory();
+
+  // 5. Main Audit Logic
   const form = document.getElementById("auditForm");
   const htmlInput = document.getElementById("htmlInput");
   const urlPanel = document.getElementById("urlPanel");
   const htmlPanel = document.getElementById("htmlPanel");
-  const providerSelect = document.getElementById("providerSelect");
-  const apiKeyInput = document.getElementById("apiKeyInput");
+  const pageTypeSelect = document.getElementById("pageTypeSelect");
   const diagCard = document.getElementById("diagCard");
   const errorBox = document.getElementById("errorBox");
   const resultsEl = document.getElementById("results");
-  const modeBadge = document.getElementById("modeBadge");
   const submitHtmlBtn = document.getElementById("submitHtmlBtn");
 
   let activeTab = "url";
@@ -301,7 +359,6 @@
     submitHtmlBtn.disabled = isLoading;
     submitBtn.querySelector("span").textContent = isLoading ? "Сканируем..." : "Проверить";
     submitHtmlBtn.querySelector("span").textContent = isLoading ? "Анализируем..." : "Разобрать HTML";
-    modeBadge.textContent = isLoading ? "Идет аудит..." : "Готов к проверке";
   }
 
   async function runAudit(body) {
@@ -314,8 +371,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...body,
-          provider: providerSelect.value,
-          api_key: apiKeyInput.value.trim() || null,
+          page_type: pageTypeSelect.value,
         }),
       });
       const data = await resp.json();
@@ -331,6 +387,7 @@
         return;
       }
       lastAudit = data;
+      saveToHistory(data);
       renderAudit(data);
     } catch (err) {
       errorBox.textContent = err.message || "Не удалось выполнить запрос.";
@@ -363,7 +420,6 @@
 
   function renderAudit(data) {
     resultsEl.classList.remove("hidden");
-    modeBadge.textContent = `Оценка: ${data.score}/100`;
 
     const circumference = 326.7;
     const offset = circumference - (circumference * data.score) / 100;
@@ -398,7 +454,6 @@
     document.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b.dataset.filter === "issues"));
     renderChecks(data.checks);
 
-    // Keywords & headings
     const kwCloud = document.getElementById("kwCloud");
     kwCloud.innerHTML = "";
     (data.top_keywords || []).forEach((item) => {
@@ -411,7 +466,6 @@
     renderBullets("listH2", data.headings.h2.length ? data.headings.h2 : ["Не найдены"]);
     renderBullets("listH3", data.headings.h3.length ? data.headings.h3 : ["Не найдены"]);
 
-    // Head code snippet
     document.getElementById("headCodeBlock").textContent = data.ai.head_snippet || "";
 
     resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -537,7 +591,7 @@
     URL.revokeObjectURL(a.href);
   }
 
-  // 5. Competitor Comparison Section
+  // 6. Competitor Comparison Section
   const compareForm = document.getElementById("compareForm");
   const compareBtn = document.getElementById("compareBtn");
   const compareError = document.getElementById("compareError");

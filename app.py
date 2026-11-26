@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -23,7 +23,7 @@ STATIC_DIR = BASE_DIR / "static"
 app = FastAPI(
     title="AI SEO & Page Auditor",
     description="Технический SEO/GEO-аудитор веб-страниц с AI-рекомендациями",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 app.add_middleware(
@@ -33,6 +33,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next: Any) -> Any:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -40,8 +50,7 @@ class AuditRequest(BaseModel):
     url: str | None = Field(default=None)
     raw_html: str | None = Field(default=None)
     demo_id: str | None = Field(default=None)
-    provider: str | None = Field(default="auto")
-    api_key: str | None = Field(default=None)
+    page_type: str = Field(default="landing")
 
 
 class CompareRequest(BaseModel):
@@ -49,9 +58,12 @@ class CompareRequest(BaseModel):
     url_b: str
 
 
-@app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request) -> HTMLResponse:
+    raw_html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    current_url = str(request.base_url).rstrip("/") + "/"
+    rendered = raw_html.replace("__SELF_URL__", current_url)
+    return HTMLResponse(content=rendered)
 
 
 @app.get("/api/health")
@@ -89,11 +101,7 @@ async def run_audit(payload: AuditRequest) -> Any:
             content={"detail": "Укажите URL, вставьте HTML-код или выберите демо-пример.", "code": "empty_input"},
         )
 
-    audit["ai"] = await generate_ai_recommendations(
-        audit,
-        provider=payload.provider,
-        custom_api_key=payload.api_key,
-    )
+    audit["ai"] = await generate_ai_recommendations(audit, page_type=payload.page_type)
     return audit
 
 

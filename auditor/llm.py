@@ -16,9 +16,15 @@ STOP_TAIL_WORDS = {
     "the", "and", "or", "for", "with", "to", "in", "on", "of", "at", "by",
 }
 
+PAGE_TYPE_LABELS = {
+    "landing": "Коммерческий лендинг / услуги",
+    "saas": "SaaS / IT-продукт",
+    "ecommerce": "Интернет-магазин / каталог",
+    "article": "Статья / блог / медиа",
+}
+
 
 def _truncate_words(text: str, max_len: int) -> str:
-    """Truncate text cleanly at word boundaries without leaving dangling prepositions."""
     clean = re.sub(r"\s+", " ", (text or "")).strip()
     if len(clean) <= max_len:
         return clean
@@ -49,48 +55,37 @@ def _format_provider_label(provider: str, model: str) -> str:
     return f"ИИ-анализ: {provider.upper()}"
 
 
-def _resolve_provider_config(provider: str | None, custom_api_key: str | None) -> dict[str, str] | None:
-    prov = (provider or "auto").lower().strip()
-    key = (custom_api_key or "").strip()
-
-    if prov == "openrouter" or (prov == "auto" and (os.getenv("OPENROUTER_API_KEY") or key.startswith("sk-or-"))):
-        api_key = key or os.getenv("OPENROUTER_API_KEY", "").strip()
-        if api_key:
-            return {
-                "provider": "openrouter",
-                "type": "openai",
-                "api_key": api_key,
-                "base_url": "https://openrouter.ai/api/v1/chat/completions",
-                "model": os.getenv("OPENROUTER_MODEL", "openrouter/free").strip() or "openrouter/free",
-            }
-
-    if prov == "nvidia" or (prov == "auto" and (os.getenv("NVIDIA_API_KEY") or key.startswith("nvapi-"))):
-        api_key = key or os.getenv("NVIDIA_API_KEY", "").strip()
-        if api_key:
-            return {
-                "provider": "nvidia",
-                "type": "openai",
-                "api_key": api_key,
-                "base_url": "https://integrate.api.nvidia.com/v1/chat/completions",
-                "model": os.getenv("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct"),
-            }
-
-    if prov == "gemini" or (prov == "auto" and os.getenv("GEMINI_API_KEY")):
-        api_key = key or os.getenv("GEMINI_API_KEY", "").strip()
-        if api_key:
-            return {
-                "provider": "gemini",
-                "type": "gemini",
-                "api_key": api_key,
-                "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-            }
-
+def _resolve_provider_config() -> dict[str, str] | None:
+    if os.getenv("OPENROUTER_API_KEY", "").strip():
+        return {
+            "provider": "openrouter",
+            "type": "openai",
+            "api_key": os.getenv("OPENROUTER_API_KEY", "").strip(),
+            "base_url": "https://openrouter.ai/api/v1/chat/completions",
+            "model": os.getenv("OPENROUTER_MODEL", "openrouter/free").strip() or "openrouter/free",
+        }
+    if os.getenv("NVIDIA_API_KEY", "").strip():
+        return {
+            "provider": "nvidia",
+            "type": "openai",
+            "api_key": os.getenv("NVIDIA_API_KEY", "").strip(),
+            "base_url": "https://integrate.api.nvidia.com/v1/chat/completions",
+            "model": os.getenv("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct"),
+        }
+    if os.getenv("GEMINI_API_KEY", "").strip():
+        return {
+            "provider": "gemini",
+            "type": "gemini",
+            "api_key": os.getenv("GEMINI_API_KEY", "").strip(),
+            "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        }
     return None
 
 
-def _build_prompt(audit: dict[str, Any]) -> str:
+def _build_prompt(audit: dict[str, Any], page_type: str = "landing") -> str:
     meta = audit["meta"]
     headings = audit["headings"]
+    goal = PAGE_TYPE_LABELS.get(page_type, PAGE_TYPE_LABELS["landing"])
     issues = [
         f"- [{c['status'].upper()}] {c['title']}: {c['detail']}"
         for c in audit["checks"]
@@ -98,6 +93,7 @@ def _build_prompt(audit: dict[str, Any]) -> str:
     ][:12]
     payload = {
         "url": audit["url"],
+        "page_type": goal,
         "score": audit["score"],
         "title": meta["title"],
         "description": meta["description"],
@@ -111,17 +107,18 @@ def _build_prompt(audit: dict[str, Any]) -> str:
     }
     schema_hint = (
         "{\n"
-        '  "summary": "Короткий деловой вывод на 2 предложения о состоянии страницы и главном приоритете.",\n'
+        '  "summary": "Деловой вывод на 2 предложения о состоянии страницы и главном приоритете.",\n'
         '  "weaknesses": ["Конкретная проблема 1", "Конкретная проблема 2", "Конкретная проблема 3"],\n'
         '  "suggested_titles": ["Вариант Title 1 (45-60 символов)", "Вариант Title 2", "Вариант Title 3"],\n'
         '  "suggested_descriptions": ["Вариант Description 1 (130-160 символов)", "Вариант Description 2"],\n'
         '  "geo_recommendations": ["Совет под нейропоиск 1", "Совет под нейропоиск 2", "Совет под нейропоиск 3"],\n'
-        '  "json_ld_snippet": "Готовый валидный JSON-LD (строка JSON без тегов <script>) для Schema.org под тематику страницы"\n'
+        '  "json_ld_snippet": "Готовый валидный JSON-LD (строка JSON без тегов <script>) для Schema.org под тип страницы"\n'
         "}"
     )
     return (
-        "Ты опытный SEO- и GEO-специалист (оптимизация под Яндекс, Google и нейропоиск). "
-        "Проанализируй данные страницы и верни СТРОГО валидный JSON без пояснений вокруг по схеме:\n"
+        f"Ты опытный SEO- и GEO-специалист. Тип оцениваемой страницы: {goal}. "
+        "Пиши простым, конкретным профессиональным языком без воды и штампов (букву е используй вместо ё). "
+        "Верни СТРОГО валидный JSON по схеме:\n"
         f"{schema_hint}\n\n"
         f"Данные страницы:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
@@ -138,20 +135,26 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(cleaned)
 
 
-def _build_default_json_ld(audit: dict[str, Any], title: str, description: str) -> str:
-    data = {
+def _build_default_json_ld(audit: dict[str, Any], title: str, description: str, page_type: str = "landing") -> str:
+    schema_type = {
+        "saas": "SoftwareApplication",
+        "ecommerce": "CollectionPage",
+        "article": "Article",
+    }.get(page_type, "WebPage")
+    data: dict[str, Any] = {
         "@context": "https://schema.org",
-        "@type": "WebPage",
+        "@type": schema_type,
         "name": title,
         "description": description,
         "url": audit["url"],
         "inLanguage": audit["meta"].get("lang") or "ru",
     }
+    if schema_type == "SoftwareApplication":
+        data["applicationCategory"] = "BusinessApplication"
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
 def build_head_snippet(audit: dict[str, Any], best_title: str, best_desc: str, json_ld_str: str) -> str:
-    """Build invisible <head> SEO snippet that never touches visible page layout."""
     url = audit["url"]
     lines = [
         "<!-- Невидимые SEO- и GEO-теги для вставки внутрь <head> (визуал страницы не меняют) -->",
@@ -170,8 +173,7 @@ def build_head_snippet(audit: dict[str, Any], best_title: str, best_desc: str, j
     return "\n".join(lines)
 
 
-def build_heuristic_recommendations(audit: dict[str, Any]) -> dict[str, Any]:
-    """Clean deterministic fallback when no LLM key is provided or API is unreachable."""
+def build_heuristic_recommendations(audit: dict[str, Any], page_type: str = "landing") -> dict[str, Any]:
     meta = audit["meta"]
     headings = audit["headings"]
     stats = audit["stats"]
@@ -230,7 +232,7 @@ def build_heuristic_recommendations(audit: dict[str, Any]) -> dict[str, Any]:
     else:
         verdict = f"Обнаружены критические пробелы в базовом SEO ({score}/100). Начните с заполнения Title, Description, единого H1 и alt-атрибутов."
 
-    json_ld_str = _build_default_json_ld(audit, suggested_titles[0], suggested_descriptions[0])
+    json_ld_str = _build_default_json_ld(audit, suggested_titles[0], suggested_descriptions[0], page_type=page_type)
     head_snippet = build_head_snippet(audit, suggested_titles[0], suggested_descriptions[0], json_ld_str)
 
     return {
@@ -291,15 +293,13 @@ async def _call_openai_model(
 
 async def generate_ai_recommendations(
     audit: dict[str, Any],
-    provider: str | None = None,
-    custom_api_key: str | None = None,
+    page_type: str = "landing",
 ) -> dict[str, Any]:
-    """Call configured LLM provider with multi-model fallback or fall back to heuristic mode."""
-    cfg = _resolve_provider_config(provider, custom_api_key)
+    cfg = _resolve_provider_config()
     if not cfg:
-        return build_heuristic_recommendations(audit)
+        return build_heuristic_recommendations(audit, page_type=page_type)
 
-    prompt = _build_prompt(audit)
+    prompt = _build_prompt(audit, page_type=page_type)
     try:
         async with httpx.AsyncClient(timeout=22.0) as client:
             if cfg["type"] == "gemini":
@@ -354,7 +354,7 @@ async def generate_ai_recommendations(
         titles = [_truncate_words(str(x), 65) for x in parsed.get("suggested_titles", []) if str(x).strip()][:3]
         descs = [_truncate_words(str(x), 165) for x in parsed.get("suggested_descriptions", []) if str(x).strip()][:2]
         if not titles or not descs:
-            fallback = build_heuristic_recommendations(audit)
+            fallback = build_heuristic_recommendations(audit, page_type=page_type)
             titles = titles or fallback["suggested_titles"]
             descs = descs or fallback["suggested_descriptions"]
 
@@ -364,7 +364,7 @@ async def generate_ai_recommendations(
         elif isinstance(raw_json_ld, str) and raw_json_ld.strip().startswith("{"):
             json_ld_str = raw_json_ld.strip()
         else:
-            json_ld_str = _build_default_json_ld(audit, titles[0], descs[0])
+            json_ld_str = _build_default_json_ld(audit, titles[0], descs[0], page_type=page_type)
 
         head_snippet = build_head_snippet(audit, titles[0], descs[0], json_ld_str)
 
@@ -380,16 +380,13 @@ async def generate_ai_recommendations(
         }
     except Exception as exc:
         logger.error("Falling back to local heuristic engine due to LLM error: %s", exc)
-        return build_heuristic_recommendations(audit)
+        return build_heuristic_recommendations(audit, page_type=page_type)
 
 
 async def generate_comparison_summary(
     audit_a: dict[str, Any],
     audit_b: dict[str, Any],
-    provider: str | None = None,
-    custom_api_key: str | None = None,
 ) -> str:
-    """Short comparison verdict between two audited pages."""
     winner = audit_a if audit_a["score"] >= audit_b["score"] else audit_b
     loser = audit_b if winner is audit_a else audit_a
     diff = abs(audit_a["score"] - audit_b["score"])
