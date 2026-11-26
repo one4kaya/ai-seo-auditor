@@ -16,7 +16,7 @@
   <meta name="twitter:title" content="Технический SEO-аудит сайтов и проверка под нейропоиск">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Russo+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
   <script type="application/ld+json">
   {
@@ -31,7 +31,6 @@
   </script>
 </head>
 <body>
-  <canvas id="wakeCanvas" aria-hidden="true"></canvas>
   <div class="ambient-mesh" aria-hidden="true"></div>
 
   <div class="hero-shell">
@@ -46,7 +45,7 @@
         <div class="nav-links">
           <a href="#auditor-section">Проверка страницы</a>
           <a href="#compare-section">Сравнение сайтов</a>
-          <a href="#methodology-section">Методика и FAQ</a>
+          <a href="#features-section">Возможности</a>
         </div>
         <a href="#auditor-section" class="btn-ghost nav-action">Открыть сканер</a>
       </nav>
@@ -62,7 +61,7 @@
           <button type="button" class="silver-btn" id="heroStartBtn">
             <span>Проверить сайт</span>
           </button>
-          <a href="#compare-section" class="btn-ghost">Сравнить с конкурентом</a>
+          <button type="button" class="btn-ghost" id="heroCompareBtn">Сравнить 2 сайта</button>
         </div>
       </header>
     </div>
@@ -76,16 +75,6 @@
           <button class="tab-btn active" data-tab="url" type="button">По ссылке (URL)</button>
           <button class="tab-btn" data-tab="html" type="button">Вставить HTML-код</button>
         </div>
-
-        <div class="goal-picker">
-          <label for="pageTypeSelect">Тип страницы:</label>
-          <select id="pageTypeSelect">
-            <option value="landing">Лендинг / Услуги</option>
-            <option value="saas">SaaS / IT-продукт</option>
-            <option value="ecommerce">Интернет-магазин</option>
-            <option value="article">Статья / Медиа</option>
-          </select>
-        </div>
       </div>
 
       <form id="auditForm">
@@ -93,24 +82,33 @@
           <div class="input-row">
             <input type="text" id="urlInput" placeholder="https://example.com" autocomplete="url">
             <button class="silver-btn" type="submit" id="submitBtn">
-              <span>Проверить</span>
+              <span class="btn-inner"><span class="btn-spinner hidden" aria-hidden="true"></span><span class="btn-label">Проверить</span></span>
             </button>
+          </div>
+          <div class="demo-row">
+            <span class="demo-label">Примеры разбора:</span>
+            <button type="button" class="btn-ghost" data-demo="flawed-landing">Лендинг с ошибками</button>
+            <button type="button" class="btn-ghost" data-demo="strong-saas">Оптимизированный SaaS</button>
           </div>
         </div>
 
         <div id="htmlPanel" class="hidden">
           <textarea id="htmlInput" placeholder="Вставьте исходный HTML-код страницы..."></textarea>
-          <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+          <div class="html-actions-row">
+            <div class="demo-row" style="margin-top:0;">
+              <span class="demo-label">Примеры разбора:</span>
+              <button type="button" class="btn-ghost" data-demo="flawed-landing">Лендинг с ошибками</button>
+              <button type="button" class="btn-ghost" data-demo="strong-saas">Оптимизированный SaaS</button>
+            </div>
             <button class="silver-btn" type="submit" id="submitHtmlBtn">
-              <span>Разобрать HTML</span>
+              <span class="btn-inner"><span class="btn-spinner hidden" aria-hidden="true"></span><span class="btn-label">Разобрать HTML</span></span>
             </button>
           </div>
         </div>
 
-        <div class="demo-row">
-          <span class="demo-label">Примеры разбора:</span>
-          <button type="button" class="btn-ghost" data-demo="flawed-landing">Лендинг с ошибками</button>
-          <button type="button" class="btn-ghost" data-demo="strong-saas">Оптимизированный SaaS</button>
+        <div id="auditProgress" class="progress-wrap hidden" aria-live="polite">
+          <div class="progress-track"><div class="progress-bar"></div></div>
+          <div class="progress-text" id="auditProgressText">Скачивание HTML страницы...</div>
         </div>
 
         <div id="historyBar" class="history-bar hidden">
@@ -297,9 +295,14 @@
         <input type="text" id="urlAInput" placeholder="Ваш сайт: https://example.com">
         <input type="text" id="urlBInput" placeholder="Конкурент: https://competitor.com">
         <button type="submit" class="silver-btn" id="compareBtn">
-          <span>Сравнить</span>
+          <span class="btn-inner"><span class="btn-spinner hidden" aria-hidden="true"></span><span class="btn-label">Сравнить</span></span>
         </button>
       </form>
+
+      <div id="compareProgress" class="progress-wrap hidden" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar"></div></div>
+        <div class="progress-text" id="compareProgressText">Параллельное сканирование страниц...</div>
+      </div>
 
       <div id="compareError" class="error-box hidden"></div>
 
@@ -320,36 +323,30 @@
       </div>
     </section>
 
-    <!-- SECTION 3: SEO METHODOLOGY & FAQ (gives semantic richness + 100/100 self-audit score) -->
-    <section class="bento-panel" id="methodology-section">
-      <div class="info-grid">
-        <div>
-          <h2>Чем этот аудит отличается от стандартного Lighthouse?</h2>
-          <p class="diag-reason">
-            Встроенные браузерные проверки фиксируют только базовое наличие тегов и не оценивают смысл контента.
-            Наш сканер анализирует страницу по 30 критериям, которые напрямую влияют на ранжирование в Яндексе, Google и цитирование в генеративных ответах нейросетей.
-          </p>
-          <ul class="bullet-list" style="margin-top:12px;">
-            <li>Контроль длины и пиксельной ширины заголовка Title, чтобы сниппет не обрезался в поиске.</li>
-            <li>Проверка смысловой связки между Title и главным заголовком H1, а также вложенности уровней H1–H3.</li>
-            <li>Оценка доли полезного текста к объему HTML-кода, стабильности картинок (width/height) и HTTP-заголовков безопасности.</li>
-            <li>Анализ структурированных данных Schema.org (JSON-LD), списков и FAQ-блоков для попадания в AI Overviews и Яндекс Нейро.</li>
-          </ul>
-        </div>
-
-        <div class="bento-tile" style="display:flex; flex-direction:column; justify-content:space-between; gap:14px;">
-          <div>
-            <h3>Как внедрить рекомендации без риска для дизайна?</h3>
-            <p class="diag-reason">
-              Все сгенерированные теги во вкладке «Код для &lt;head&gt;» относятся исключительно к технической шапке документа.
-              Они обновляют заголовок вкладки, описание сниппета, превью для мессенджеров и микроразметку Schema.org, оставляя сетку, шрифты и визуальное оформление страницы без изменений.
-            </p>
-          </div>
-          <img src="/static/og-preview.svg" width="600" height="315" loading="lazy" alt="Схема работы технического SEO и GEO аудитора страниц" style="width:100%; height:auto; border-radius:10px; border:1px solid var(--border);">
-        </div>
+    <!-- SECTION 3: COMPACT FEATURES STRIP -->
+    <section class="features-strip" id="features-section" aria-label="Ключевые возможности">
+      <div class="feature-card">
+        <div class="feature-num">01 · 30 МЕТРИК</div>
+        <div class="feature-title">Индексация, структура и скорость</div>
+        <p class="feature-desc">Проверка мета-тегов, H1–H3, alt-атрибутов, CLS, веса HTML и security-заголовков.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">02 · GEO-АНАЛИЗ</div>
+        <div class="feature-title">Готовность к нейропоиску</div>
+        <p class="feature-desc">Оценка Schema.org (JSON-LD), списков и FAQ для цитирования в AI Overviews и Perplexity.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">03 · 2 URL</div>
+        <div class="feature-title">Параллельный разбор конкурентов</div>
+        <p class="feature-desc">Сравнение двух страниц по SEO-скору, контенту, разметке и скорости ответа.</p>
       </div>
     </section>
   </main>
+
+  <footer class="container site-footer">
+    <span>AI SEO &amp; Page Auditor</span>
+    <span>Технический SEO/GEO-сканер · FastAPI · OpenRouter</span>
+  </footer>
 
   <script src="/static/app.js"></script>
 </body>

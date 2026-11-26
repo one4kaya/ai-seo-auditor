@@ -3,132 +3,18 @@
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // 1. Crisp, smooth ASCII Wake pointer trail (clearly visible, no glitchy dots)
-  (function initAsciiWake() {
-    const canvas = document.getElementById("wakeCanvas");
-    if (!canvas || reducedMotion) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const RAMP = " .:-=+*#%@";
-    const cellSize = 15;
-    let cols = 0;
-    let rows = 0;
-    let heat = new Float32Array(0);
-    let rate = new Float32Array(0);
-    let last = 0;
-    const pointer = { x: -1, y: -1, t: 0, has: false };
-
-    function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.font = `600 ${Math.round(cellSize * 0.82)}px "JetBrains Mono", ui-monospace, monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      cols = Math.ceil(w / cellSize);
-      rows = Math.ceil(h / cellSize);
-      const n = cols * rows;
-      heat = new Float32Array(n);
-      rate = new Float32Array(n).fill(1.35);
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      for (let gy = 0; gy < rows; gy++) {
-        for (let gx = 0; gx < cols; gx++) {
-          const idx = gy * cols + gx;
-          const lum = heat[idx];
-          if (lum <= 0.03) continue;
-          const ch = RAMP[Math.min(RAMP.length - 1, Math.floor(lum * (RAMP.length - 1)))];
-          if (ch === " ") continue;
-          ctx.fillStyle = `rgba(214, 222, 248, ${(lum * 0.44).toFixed(3)})`;
-          ctx.fillText(ch, gx * cellSize + cellSize / 2, gy * cellSize + cellSize / 2);
-        }
-      }
-    }
-
-    function stamp(px, py, radiusCells, decayRate) {
-      const cx = px / cellSize;
-      const cy = py / cellSize;
-      const r = Math.max(1.2, radiusCells);
-      const minGx = Math.max(0, Math.floor(cx - r));
-      const maxGx = Math.min(cols - 1, Math.ceil(cx + r));
-      const minGy = Math.max(0, Math.floor(cy - r));
-      const maxGy = Math.min(rows - 1, Math.ceil(cy + r));
-      for (let gy = minGy; gy <= maxGy; gy++) {
-        for (let gx = minGx; gx <= maxGx; gx++) {
-          const d = Math.hypot(gx + 0.5 - cx, gy + 0.5 - cy);
-          if (d > r) continue;
-          const falloff = Math.pow(1 - d / r, 1.35);
-          const idx = gy * cols + gx;
-          if (falloff > heat[idx]) {
-            heat[idx] = falloff;
-            rate[idx] = decayRate;
-          }
-        }
-      }
-    }
-
-    resize();
-    window.addEventListener("pointermove", (e) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      const now = performance.now();
-      if (pointer.has) {
-        const dx = x - pointer.x;
-        const dy = y - pointer.y;
-        const dist = Math.hypot(dx, dy);
-        const dt = Math.max(1, now - pointer.t);
-        const speed = dist / dt;
-        const radiusCells = Math.max(1.5, Math.min(3.2, 3.0 / (1 + speed * 1.1)));
-        const decayRate = Math.max(0.95, Math.min(2.6, 1.05 + speed * 1.6));
-        const steps = Math.max(1, Math.ceil(dist / (cellSize * 0.4)));
-        for (let s = 1; s <= steps; s++) {
-          const t = s / steps;
-          stamp(pointer.x + dx * t, pointer.y + dy * t, radiusCells, decayRate);
-        }
-      } else {
-        stamp(x, y, 2.2, 1.2);
-      }
-      pointer.x = x;
-      pointer.y = y;
-      pointer.t = now;
-      pointer.has = true;
-    }, { passive: true });
-
-    window.addEventListener("resize", resize, { passive: true });
-
-    function loop(now) {
-      const dt = last ? Math.min(64, now - last) / 1000 : 1 / 60;
-      last = now;
-      for (let i = 0; i < heat.length; i++) {
-        if (heat[i] > 0) {
-          heat[i] = Math.max(0, heat[i] - rate[i] * dt);
-        }
-      }
-      draw();
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-  })();
-
-  // 2. Animated Celestial Horizon & Orbiting Light Flare (Hero top centerpiece)
+  // 1. Soft, wide, slowly drifting atmospheric Horizon (Hero top centerpiece)
   (function initHorizon() {
     const canvas = document.getElementById("horizonCanvas");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const stars = Array.from({ length: 56 }, (_, i) => ({
+    const stars = Array.from({ length: 44 }, (_, i) => ({
       rx: ((i * 73 + 19) % 100) / 100,
       ry: ((i * 41 + 11) % 100) / 100,
-      r: (i % 3 === 0) ? 1.3 : 0.8,
-      speed: 0.4 + (i % 5) * 0.25,
+      r: (i % 3 === 0) ? 1.15 : 0.75,
+      speed: 0.35 + (i % 5) * 0.2,
       phase: i * 0.7,
     }));
 
@@ -145,8 +31,8 @@
       // Subtle twinkling stars in upper sky
       stars.forEach((s) => {
         const sx = s.rx * w;
-        const sy = s.ry * (h * 0.72);
-        const alpha = 0.14 + 0.22 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
+        const sy = s.ry * (h * 0.65);
+        const alpha = 0.1 + 0.16 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
         ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(3)})`;
         ctx.beginPath();
         ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
@@ -154,68 +40,63 @@
       });
 
       const cx = w / 2;
-      const radius = Math.max(760, w * 0.66);
-      const cy = -radius + 132;
+      const radius = Math.max(820, w * 0.72);
+      const cy = -radius + 78;
 
-      // Outer atmospheric corona
-      const corona = ctx.createRadialGradient(cx, cy, radius - 6, cx, cy, radius + 120);
-      corona.addColorStop(0, "rgba(226, 232, 248, 0.34)");
-      corona.addColorStop(0.28, "rgba(165, 180, 225, 0.14)");
-      corona.addColorStop(0.65, "rgba(100, 116, 155, 0.04)");
+      // Soft outer atmospheric corona
+      const corona = ctx.createRadialGradient(cx, cy, radius - 8, cx, cy, radius + 140);
+      corona.addColorStop(0, "rgba(210, 220, 244, 0.18)");
+      corona.addColorStop(0.32, "rgba(148, 163, 210, 0.08)");
+      corona.addColorStop(0.7, "rgba(90, 105, 145, 0.02)");
       corona.addColorStop(1, "rgba(7, 7, 10, 0)");
 
       ctx.fillStyle = corona;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius + 120, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius + 140, 0, Math.PI * 2);
       ctx.fill();
 
-      // Dark planetary sphere with internal subtle rim reflection
+      // Dark planetary sphere with subtle rim
       const planetFill = ctx.createRadialGradient(cx, cy + radius * 0.25, radius * 0.15, cx, cy, radius);
       planetFill.addColorStop(0, "#0b0c12");
-      planetFill.addColorStop(0.86, "#07070a");
-      planetFill.addColorStop(0.97, "#111420");
-      planetFill.addColorStop(1, "#262b3d");
+      planetFill.addColorStop(0.88, "#07070a");
+      planetFill.addColorStop(0.98, "#0e111b");
+      planetFill.addColorStop(1, "#1c2030");
       ctx.fillStyle = planetFill;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Base silver horizon rim
+      // Barely noticeable thin horizon contour
       const baseRim = ctx.createLinearGradient(cx - radius * 0.55, 0, cx + radius * 0.55, 0);
       baseRim.addColorStop(0, "rgba(255,255,255,0)");
-      baseRim.addColorStop(0.5, "rgba(226, 232, 248, 0.52)");
+      baseRim.addColorStop(0.5, "rgba(226, 232, 248, 0.18)");
       baseRim.addColorStop(1, "rgba(255,255,255,0)");
       ctx.strokeStyle = baseRim;
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0.18 * Math.PI, 0.82 * Math.PI);
       ctx.stroke();
 
-      // Orbiting light pulse sweeping smoothly back and forth along the horizon arc
-      const sweepAngle = Math.PI * 0.5 + Math.sin(t * 0.75) * 0.24;
-      const fx = cx + Math.cos(sweepAngle) * radius;
-      const fy = cy + Math.sin(sweepAngle) * radius;
+      // Wide, soft, slowly drifting atmospheric glow along the horizon contour
+      const driftAngle = Math.PI * 0.5 + Math.sin(t * 0.35) * 0.22;
+      const fx = cx + Math.cos(driftAngle) * radius;
+      const fy = cy + Math.sin(driftAngle) * radius;
 
-      const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, 135);
-      flare.addColorStop(0, "rgba(255, 255, 255, 0.82)");
-      flare.addColorStop(0.2, "rgba(219, 230, 255, 0.34)");
-      flare.addColorStop(0.55, "rgba(148, 163, 210, 0.08)");
-      flare.addColorStop(1, "rgba(7, 7, 10, 0)");
-
-      ctx.fillStyle = flare;
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.scale(2.4, 0.65);
+      const wideGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 170);
+      wideGlow.addColorStop(0, "rgba(226, 234, 252, 0.16)");
+      wideGlow.addColorStop(0.45, "rgba(186, 200, 235, 0.07)");
+      wideGlow.addColorStop(1, "rgba(7, 7, 10, 0)");
+      ctx.fillStyle = wideGlow;
       ctx.beginPath();
-      ctx.arc(fx, fy, 135, 0, Math.PI * 2);
+      ctx.arc(0, 0, 170, 0, Math.PI * 2);
       ctx.fill();
-
-      // Bright core arc segment around the traveling flare
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, sweepAngle - 0.055, sweepAngle + 0.055);
-      ctx.stroke();
+      ctx.restore();
 
       if (!reducedMotion) {
-        t += 0.022;
+        t += 0.016;
         requestAnimationFrame(drawHorizon);
       }
     }
@@ -226,23 +107,34 @@
     }, { passive: true });
   })();
 
-  // 3. Hero CTA smooth scroll + Silver Spotlight highlight on target input & submit button
+  // 2. Hero CTA smooth scroll + Silver Spotlight highlight on target inputs & submit buttons
   const heroStartBtn = document.getElementById("heroStartBtn");
+  const heroCompareBtn = document.getElementById("heroCompareBtn");
   const urlInput = document.getElementById("urlInput");
   const submitBtn = document.getElementById("submitBtn");
   const auditorSection = document.getElementById("auditor-section");
+  const compareSection = document.getElementById("compare-section");
+  const urlAInput = document.getElementById("urlAInput");
+  const urlBInput = document.getElementById("urlBInput");
+  const compareBtnEl = document.getElementById("compareBtn");
 
-  heroStartBtn?.addEventListener("click", () => {
-    auditorSection.scrollIntoView({ behavior: "smooth", block: "center" });
+  function spotlightElements(sectionEl, focusEl, targets) {
+    sectionEl.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => {
-      urlInput.focus();
-      urlInput.classList.add("target-spotlight");
-      submitBtn.classList.add("target-spotlight");
+      focusEl.focus();
+      targets.forEach((el) => el?.classList.add("target-spotlight"));
       setTimeout(() => {
-        urlInput.classList.remove("target-spotlight");
-        submitBtn.classList.remove("target-spotlight");
+        targets.forEach((el) => el?.classList.remove("target-spotlight"));
       }, 2400);
     }, 350);
+  }
+
+  heroStartBtn?.addEventListener("click", () => {
+    spotlightElements(auditorSection, urlInput, [urlInput, submitBtn]);
+  });
+
+  heroCompareBtn?.addEventListener("click", () => {
+    spotlightElements(compareSection, urlAInput, [urlAInput, urlBInput, compareBtnEl]);
   });
 
   // 4. Recent Audits History in localStorage
@@ -295,11 +187,12 @@
   const htmlInput = document.getElementById("htmlInput");
   const urlPanel = document.getElementById("urlPanel");
   const htmlPanel = document.getElementById("htmlPanel");
-  const pageTypeSelect = document.getElementById("pageTypeSelect");
   const diagCard = document.getElementById("diagCard");
   const errorBox = document.getElementById("errorBox");
   const resultsEl = document.getElementById("results");
   const submitHtmlBtn = document.getElementById("submitHtmlBtn");
+  const auditProgress = document.getElementById("auditProgress");
+  const auditProgressText = document.getElementById("auditProgressText");
 
   let activeTab = "url";
   let lastAudit = null;
@@ -354,11 +247,37 @@
     }
   });
 
+  let auditProgressTimer = null;
+
   function setLoading(isLoading) {
     submitBtn.disabled = isLoading;
     submitHtmlBtn.disabled = isLoading;
-    submitBtn.querySelector("span").textContent = isLoading ? "Сканируем..." : "Проверить";
-    submitHtmlBtn.querySelector("span").textContent = isLoading ? "Анализируем..." : "Разобрать HTML";
+    submitBtn.querySelector(".btn-label").textContent = isLoading ? "Сканируем..." : "Проверить";
+    submitHtmlBtn.querySelector(".btn-label").textContent = isLoading ? "Анализируем..." : "Разобрать HTML";
+    submitBtn.querySelector(".btn-spinner")?.classList.toggle("hidden", !isLoading);
+    submitHtmlBtn.querySelector(".btn-spinner")?.classList.toggle("hidden", !isLoading);
+
+    if (auditProgressTimer) {
+      clearInterval(auditProgressTimer);
+      auditProgressTimer = null;
+    }
+
+    if (isLoading) {
+      const steps = [
+        "Скачивание HTML страницы...",
+        "Проверка 30 SEO- и GEO-метрик...",
+        "Генерация рекомендаций через LLM...",
+      ];
+      let stepIdx = 0;
+      auditProgressText.textContent = steps[0];
+      auditProgress.classList.remove("hidden");
+      auditProgressTimer = setInterval(() => {
+        stepIdx = Math.min(steps.length - 1, stepIdx + 1);
+        auditProgressText.textContent = steps[stepIdx];
+      }, 1700);
+    } else {
+      auditProgress.classList.add("hidden");
+    }
   }
 
   async function runAudit(body) {
@@ -369,10 +288,7 @@
       const resp = await fetch("/api/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          page_type: pageTypeSelect.value,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       if (!resp.ok) {
@@ -596,6 +512,9 @@
   const compareBtn = document.getElementById("compareBtn");
   const compareError = document.getElementById("compareError");
   const compareResults = document.getElementById("compareResults");
+  const compareProgress = document.getElementById("compareProgress");
+  const compareProgressText = document.getElementById("compareProgressText");
+  let compareProgressTimer = null;
 
   compareForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -609,7 +528,22 @@
       return;
     }
     compareBtn.disabled = true;
-    compareBtn.querySelector("span").textContent = "Сравниваем...";
+    compareBtn.querySelector(".btn-label").textContent = "Сравниваем...";
+    compareBtn.querySelector(".btn-spinner")?.classList.remove("hidden");
+
+    const cmpSteps = [
+      "Параллельное сканирование страниц...",
+      "Сравнение 30 SEO- и GEO-метрик...",
+      "Формирование вывода через LLM...",
+    ];
+    let cmpIdx = 0;
+    compareProgressText.textContent = cmpSteps[0];
+    compareProgress.classList.remove("hidden");
+    compareProgressTimer = setInterval(() => {
+      cmpIdx = Math.min(cmpSteps.length - 1, cmpIdx + 1);
+      compareProgressText.textContent = cmpSteps[cmpIdx];
+    }, 1700);
+
     try {
       const resp = await fetch("/api/compare", {
         method: "POST",
@@ -625,8 +559,14 @@
       compareError.textContent = err.message;
       compareError.classList.remove("hidden");
     } finally {
+      if (compareProgressTimer) {
+        clearInterval(compareProgressTimer);
+        compareProgressTimer = null;
+      }
+      compareProgress.classList.add("hidden");
       compareBtn.disabled = false;
-      compareBtn.querySelector("span").textContent = "Сравнить";
+      compareBtn.querySelector(".btn-label").textContent = "Сравнить";
+      compareBtn.querySelector(".btn-spinner")?.classList.add("hidden");
     }
   });
 
